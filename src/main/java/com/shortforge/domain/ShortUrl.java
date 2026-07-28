@@ -55,7 +55,8 @@ public class ShortUrl {
     }
 
     public boolean isExpired(Instant now) {
-        return expiresAt != null && expiresAt.isBefore(now);
+        return expiresAt != null
+                && !expiresAt.isAfter(now);
     }
 
     public Long getId() {

@@ -1,44 +1,55 @@
 package com.shortforge.service;
 
+import com.shortforge.cache.UrlCacheService;
 import com.shortforge.domain.ShortUrl;
 import com.shortforge.dto.CreateShortUrlRequest;
 import com.shortforge.dto.CreateShortUrlResponse;
 import com.shortforge.dto.UrlAnalyticsResponse;
+import com.shortforge.event.UrlEventPublisher;
 import com.shortforge.exception.ShortUrlNotFoundException;
 import com.shortforge.exception.ShortUrlUnavailableException;
 import com.shortforge.repository.ShortUrlRepository;
-import com.shortforge.util.ShortCodeGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.shortforge.cache.UrlCacheService;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 
 @Service
 public class ShortUrlService {
 
-    private static final int MAX_GENERATION_ATTEMPTS = 5;
+    private static final String CODE_CHARACTERS =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    + "abcdefghijklmnopqrstuvwxyz"
+                    + "0123456789";
+
+    private static final int SHORT_CODE_LENGTH = 8;
 
     private final ShortUrlRepository repository;
-    private final ShortCodeGenerator codeGenerator;
-    private final String baseUrl;
     private final UrlCacheService urlCacheService;
+    private final UrlEventPublisher urlEventPublisher;
+    private final SecureRandom secureRandom;
+    private final String baseUrl;
 
     public ShortUrlService(
             ShortUrlRepository repository,
-            ShortCodeGenerator codeGenerator,
             UrlCacheService urlCacheService,
-            @Value("${app.base-url:http://localhost:8080}") String baseUrl
+            UrlEventPublisher urlEventPublisher,
+            @Value("${app.base-url:http://localhost:8080}")
+            String baseUrl
     ) {
         this.repository = repository;
-        this.codeGenerator = codeGenerator;
         this.urlCacheService = urlCacheService;
+        this.urlEventPublisher = urlEventPublisher;
         this.baseUrl = baseUrl;
+        this.secureRandom = new SecureRandom();
     }
 
     @Transactional
-    public CreateShortUrlResponse create(CreateShortUrlRequest request) {
+    public CreateShortUrlResponse create(
+            CreateShortUrlRequest request
+    ) {
         String shortCode = generateUniqueCode();
         Instant createdAt = Instant.now();
 
@@ -51,6 +62,11 @@ public class ShortUrlService {
 
         ShortUrl saved = repository.save(shortUrl);
 
+        urlEventPublisher.publishCreated(
+                saved.getShortCode(),
+                saved.getOriginalUrl()
+        );
+
         return new CreateShortUrlResponse(
                 saved.getShortCode(),
                 baseUrl + "/" + saved.getShortCode(),
@@ -61,20 +77,31 @@ public class ShortUrlService {
     }
 
     @Transactional
-    public String resolveAndRecordClick(String shortCode) {
+    public String resolveAndRecordClick(
+            String shortCode
+    ) {
         return urlCacheService.getOriginalUrl(shortCode)
                 .map(originalUrl ->
-                        handleCacheHit(shortCode, originalUrl)
+                        handleCacheHit(
+                                shortCode,
+                                originalUrl
+                        )
                 )
                 .orElseGet(() ->
                         handleCacheMiss(shortCode)
                 );
     }
 
-
     @Transactional(readOnly = true)
-    public UrlAnalyticsResponse getAnalytics(String shortCode) {
-        ShortUrl shortUrl = find(shortCode);
+    public UrlAnalyticsResponse getAnalytics(
+            String shortCode
+    ) {
+        ShortUrl shortUrl = repository.findByShortCode(shortCode)
+                .orElseThrow(() ->
+                        new ShortUrlNotFoundException(
+                                "Short URL not found: " + shortCode
+                        )
+                );
 
         return new UrlAnalyticsResponse(
                 shortUrl.getShortCode(),
@@ -97,32 +124,63 @@ public class ShortUrlService {
             urlCacheService.evict(shortCode);
 
             throw new ShortUrlUnavailableException(
-                    "Short URL is no longer available: "
+                    "Short URL is inactive or expired: "
                             + shortCode
             );
         }
 
+        urlEventPublisher.publishVisited(
+                shortCode,
+                originalUrl
+        );
+
         return originalUrl;
     }
 
-    private String handleCacheMiss(String shortCode) {
-        ShortUrl shortUrl = find(shortCode);
+    private String handleCacheMiss(
+            String shortCode
+    ) {
+        ShortUrl shortUrl = repository.findByShortCode(shortCode)
+                .orElseThrow(() ->
+                        new ShortUrlNotFoundException(
+                                "Short URL not found: " + shortCode
+                        )
+                );
 
         validateAvailability(shortUrl);
 
-        shortUrl.recordClick();
+        int updatedRows =
+                repository.incrementClickCount(shortCode);
+
+        if (updatedRows == 0) {
+            throw new ShortUrlUnavailableException(
+                    "Short URL is inactive or expired: "
+                            + shortCode
+            );
+        }
 
         urlCacheService.put(
-                shortUrl.getShortCode(),
+                shortCode,
                 shortUrl.getOriginalUrl(),
                 shortUrl.getExpiresAt()
+        );
+
+        urlEventPublisher.publishVisited(
+                shortUrl.getShortCode(),
+                shortUrl.getOriginalUrl()
         );
 
         return shortUrl.getOriginalUrl();
     }
 
-    private void validateAvailability(ShortUrl shortUrl) {
+    private void validateAvailability(
+            ShortUrl shortUrl
+    ) {
         if (!shortUrl.isActive()) {
+            urlCacheService.evict(
+                    shortUrl.getShortCode()
+            );
+
             throw new ShortUrlUnavailableException(
                     "Short URL is inactive: "
                             + shortUrl.getShortCode()
@@ -130,6 +188,10 @@ public class ShortUrlService {
         }
 
         if (shortUrl.isExpired(Instant.now())) {
+            urlCacheService.evict(
+                    shortUrl.getShortCode()
+            );
+
             throw new ShortUrlUnavailableException(
                     "Short URL has expired: "
                             + shortUrl.getShortCode()
@@ -137,22 +199,36 @@ public class ShortUrlService {
         }
     }
 
-    private ShortUrl find(String shortCode) {
-        return repository.findByShortCode(shortCode)
-                .orElseThrow(() -> new ShortUrlNotFoundException(shortCode));
+    private String generateUniqueCode() {
+        String shortCode;
+
+        do {
+            shortCode = generateCode();
+        } while (repository.existsByShortCode(shortCode));
+
+        return shortCode;
     }
 
-    private String generateUniqueCode() {
-        for (int attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
-            String candidate = codeGenerator.generate();
+    private String generateCode() {
+        StringBuilder code =
+                new StringBuilder(SHORT_CODE_LENGTH);
 
-            if (!repository.existsByShortCode(candidate)) {
-                return candidate;
-            }
+        for (int index = 0;
+             index < SHORT_CODE_LENGTH;
+             index++) {
+
+            int characterIndex =
+                    secureRandom.nextInt(
+                            CODE_CHARACTERS.length()
+                    );
+
+            code.append(
+                    CODE_CHARACTERS.charAt(
+                            characterIndex
+                    )
+            );
         }
 
-        throw new IllegalStateException(
-                "Unable to generate a unique short code"
-        );
+        return code.toString();
     }
 }

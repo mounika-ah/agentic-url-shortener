@@ -2,14 +2,6 @@ spring:
   application:
     name: agentic-url-shortener
 
-  app:
-    base-url: ${APP_BASE_URL:http://localhost:8080}
-    cache:
-      url-ttl: ${URL_CACHE_TTL:30m}
-    idempotency:
-      result-ttl: ${IDEMPOTENCY_RESULT_TTL:24h}
-      lock-ttl: ${IDEMPOTENCY_LOCK_TTL:60s}
-
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/shortforge}
     username: ${DB_USERNAME:shortforge}
@@ -23,6 +15,16 @@ spring:
       connect-timeout: 2s
       timeout: 2s
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+
+      properties:
+        "[spring.json.add.type.headers]": false
+
   jpa:
     open-in-view: false
     hibernate:
@@ -34,6 +36,16 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+
+  cache:
+    url-ttl: ${URL_CACHE_TTL:30m}
+
+  idempotency:
+    result-ttl: ${IDEMPOTENCY_RESULT_TTL:24h}
+    lock-ttl: ${IDEMPOTENCY_LOCK_TTL:60s}
 
 management:
   endpoints:

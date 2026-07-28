@@ -15,11 +15,15 @@ public interface ShortUrlRepository extends JpaRepository<ShortUrl, Long> {
 
     @Modifying
     @Query("""
-            update ShortUrl s
-               set s.clickCount = s.clickCount + 1
-             where s.shortCode = :shortCode
-               and s.active = true
-            """)
+        update ShortUrl s
+           set s.clickCount = s.clickCount + 1
+         where s.shortCode = :shortCode
+           and s.active = true
+           and (
+                s.expiresAt is null
+                or s.expiresAt > CURRENT_TIMESTAMP
+           )
+        """)
     int incrementClickCount(
             @Param("shortCode") String shortCode
     );
