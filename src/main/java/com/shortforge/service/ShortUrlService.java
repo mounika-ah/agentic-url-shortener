@@ -98,9 +98,7 @@ public class ShortUrlService {
     ) {
         ShortUrl shortUrl = repository.findByShortCode(shortCode)
                 .orElseThrow(() ->
-                        new ShortUrlNotFoundException(
-                                "Short URL not found: " + shortCode
-                        )
+                        new ShortUrlNotFoundException(shortCode)
                 );
 
         return new UrlAnalyticsResponse(
@@ -142,9 +140,7 @@ public class ShortUrlService {
     ) {
         ShortUrl shortUrl = repository.findByShortCode(shortCode)
                 .orElseThrow(() ->
-                        new ShortUrlNotFoundException(
-                                "Short URL not found: " + shortCode
-                        )
+                        new ShortUrlNotFoundException(shortCode)
                 );
 
         validateAvailability(shortUrl);
