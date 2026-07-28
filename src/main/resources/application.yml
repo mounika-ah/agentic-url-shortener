@@ -3,20 +3,20 @@ spring:
     name: agentic-url-shortener
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/shortforge}
-    username: ${DB_USERNAME:shortforge}
-    password: ${DB_PASSWORD:shortforge}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/shortforge}
+    username: ${SPRING_DATASOURCE_USERNAME:shortforge}
+    password: ${SPRING_DATASOURCE_PASSWORD:shortforge}
     driver-class-name: org.postgresql.Driver
 
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
       connect-timeout: 2s
       timeout: 2s
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
 
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer

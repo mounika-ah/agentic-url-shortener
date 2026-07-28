@@ -1,0 +1,124 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: shortforge-postgres
+    environment:
+      POSTGRES_DB: shortforge
+      POSTGRES_USER: shortforge
+      POSTGRES_PASSWORD: shortforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U shortforge -d shortforge
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: shortforge-redis
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.1.14
+    container_name: shortforge-redpanda
+    command:
+      - redpanda
+      - start
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+      - --rpc-addr
+      - redpanda:33145
+      - --advertise-rpc-addr
+      - redpanda:33145
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --default-log-level=info
+    ports:
+      - "19092:19092"
+      - "9644:9644"
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test:
+        - CMD
+        - rpk
+        - cluster
+        - info
+        - --brokers
+        - localhost:9092
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+    restart: unless-stopped
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v3.9.0
+    container_name: shortforge-redpanda-console
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "8081:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shortforge-app
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/shortforge
+      SPRING_DATASOURCE_USERNAME: shortforge
+      SPRING_DATASOURCE_PASSWORD: shortforge
+
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+
+      APP_BASE_URL: http://localhost:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  redpanda-data:
