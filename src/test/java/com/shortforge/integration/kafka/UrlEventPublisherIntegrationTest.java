@@ -43,7 +43,7 @@ class UrlEventPublisherIntegrationTest extends AbstractIntegrationTest {
             ConsumerRecord<String, UrlEvent> record =
                     awaitRecord(consumer);
 
-            assertThat(record.topic())gi
+            assertThat(record.topic())
                     .isEqualTo(KafkaConfig.URL_EVENTS_TOPIC);
 
             assertThat(record.key())
