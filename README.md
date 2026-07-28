@@ -13,12 +13,25 @@
 - Cache-Aside Redis Strategy
 - Redirect Performance Optimization
 
-### 🚧 Next
+Update progress:
 
-- Idempotency
-- Kafka Events
-- Agentic Workflow
-- Tests
+```markdown
+### Completed
+
+- Core URL shortening APIs
+- Redirect analytics
+- PostgreSQL persistence
+- Redis cache-aside redirects
+- Idempotent URL creation
+- Request fingerprint validation
+- Redis processing locks
+- Global exception handling
+
+### Next
+
+- Kafka event streaming
+- Agentic workflow engine
+- Tests and CI
 
 ## Implemented APIs
 
@@ -68,3 +81,28 @@ short-url:{shortCode}
 Example:
 
 short-url:40Af6s9L
+
+## Idempotent URL Creation
+
+The create URL API supports the `Idempotency-Key` header to prevent duplicate URL creation during retries.
+
+### Behavior
+
+- A new key creates a short URL.
+- Repeating the same request with the same key returns the original result.
+- Reusing the key with a different payload returns `409 Conflict`.
+- Redis stores completed results for 24 hours.
+- A short-lived Redis lock prevents concurrent duplicate processing.
+
+### Example
+
+```http
+POST /api/v1/urls
+Idempotency-Key: google-create-001
+Content-Type: application/json
+
+{
+  "originalUrl": "https://www.google.com"
+}
+
+
