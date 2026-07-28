@@ -24,6 +24,9 @@ spring:
 
       properties:
         "[spring.json.add.type.headers]": false
+        "[request.timeout.ms]": 30000
+        "[delivery.timeout.ms]": 120000
+        "[max.block.ms]": 60000
 
   jpa:
     open-in-view: false

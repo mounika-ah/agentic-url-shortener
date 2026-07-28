@@ -16,12 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
                 "spring.flyway.enabled=true",
 
                 // Prevent Kafka consumers from starting during these tests.
-                "spring.kafka.listener.auto-startup=false",
-
-                // Prevent a missing Kafka broker from blocking startup.
-                "spring.kafka.producer.properties.max.block.ms=1000",
-                "spring.kafka.producer.properties.delivery.timeout.ms=1000",
-                "spring.kafka.producer.properties.request.timeout.ms=1000"
+                "spring.kafka.listener.auto-startup=false"
         }
 )
 @Import(TestContainersConfig.class)

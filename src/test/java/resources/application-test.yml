@@ -10,6 +10,11 @@ spring:
   kafka:
     listener:
       auto-startup: false
+    producer:
+      properties:
+        "[request.timeout.ms]": 10000
+        "[delivery.timeout.ms]": 30000
+        "[max.block.ms]": 10000
 
 logging:
   level:

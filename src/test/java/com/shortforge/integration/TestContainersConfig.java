@@ -1,9 +1,11 @@
 package com.shortforge.integration;
 
+
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -15,6 +17,9 @@ public class TestContainersConfig {
 
     private static final DockerImageName REDIS_IMAGE =
             DockerImageName.parse("redis:7-alpine");
+
+    private static final DockerImageName KAFKA_IMAGE =
+            DockerImageName.parse("apache/kafka-native:3.9.1");
 
     @Bean
     @ServiceConnection
@@ -31,5 +36,11 @@ public class TestContainersConfig {
         return new GenericContainer<>(REDIS_IMAGE)
                 .withExposedPorts(6379)
                 .withReuse(false);
+    }
+
+    @Bean
+    @ServiceConnection
+    KafkaContainer kafkaContainer() {
+        return new KafkaContainer(KAFKA_IMAGE);
     }
 }
