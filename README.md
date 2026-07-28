@@ -1,27 +1,24 @@
-## 🚀 Current Progress
+## Current Progress
 
 ### ✅ Completed
 
-- Project bootstrap with Spring Boot 4.1
-- Java 21 configuration
-- PostgreSQL integration
-- Redis integration
-- Flyway database migrations
-- Spring Boot Actuator
-- Global exception handling
-- URL shortening REST API
-- Redirect endpoint
-- URL analytics endpoint
-- Input validation
-- Clean layered architecture
+- Spring Boot 4.1
+- PostgreSQL
+- Redis Integration
+- Flyway
+- URL Shortening APIs
+- Redirect APIs
+- Analytics APIs
+- Global Exception Handling
+- Cache-Aside Redis Strategy
+- Redirect Performance Optimization
 
-### 🚧 In Progress
+### 🚧 Next
 
-- Redis cache-aside strategy
-- Idempotency support
-- Kafka event streaming
-- Agentic workflow engine
-- Unit & Integration tests
+- Idempotency
+- Kafka Events
+- Agentic Workflow
+- Tests
 
 ## Implemented APIs
 
@@ -51,3 +48,23 @@ Response
   "originalUrl": "https://www.google.com"
 }
 ```
+## Redis Cache Architecture
+
+The application uses the Cache-Aside pattern for redirect optimization.
+
+Flow:
+
+1. Client requests `/abc123`
+2. Check Redis
+3. Cache Hit → Return original URL
+4. Cache Miss → Query PostgreSQL
+5. Store result in Redis with TTL
+6. Return original URL
+
+### Redis Keys
+
+short-url:{shortCode}
+
+Example:
+
+short-url:40Af6s9L

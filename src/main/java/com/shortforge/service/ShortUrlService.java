@@ -11,6 +11,7 @@ import com.shortforge.util.ShortCodeGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.shortforge.cache.UrlCacheService;
 
 import java.time.Instant;
 
@@ -22,14 +23,17 @@ public class ShortUrlService {
     private final ShortUrlRepository repository;
     private final ShortCodeGenerator codeGenerator;
     private final String baseUrl;
+    private final UrlCacheService urlCacheService;
 
     public ShortUrlService(
             ShortUrlRepository repository,
             ShortCodeGenerator codeGenerator,
+            UrlCacheService urlCacheService,
             @Value("${app.base-url:http://localhost:8080}") String baseUrl
     ) {
         this.repository = repository;
         this.codeGenerator = codeGenerator;
+        this.urlCacheService = urlCacheService;
         this.baseUrl = baseUrl;
     }
 
@@ -58,24 +62,15 @@ public class ShortUrlService {
 
     @Transactional
     public String resolveAndRecordClick(String shortCode) {
-        ShortUrl shortUrl = find(shortCode);
-
-        if (!shortUrl.isActive()) {
-            throw new ShortUrlUnavailableException(
-                    "Short URL is inactive: " + shortCode
-            );
-        }
-
-        if (shortUrl.isExpired(Instant.now())) {
-            throw new ShortUrlUnavailableException(
-                    "Short URL has expired: " + shortCode
-            );
-        }
-
-        shortUrl.recordClick();
-
-        return shortUrl.getOriginalUrl();
+        return urlCacheService.getOriginalUrl(shortCode)
+                .map(originalUrl ->
+                        handleCacheHit(shortCode, originalUrl)
+                )
+                .orElseGet(() ->
+                        handleCacheMiss(shortCode)
+                );
     }
+
 
     @Transactional(readOnly = true)
     public UrlAnalyticsResponse getAnalytics(String shortCode) {
@@ -89,6 +84,57 @@ public class ShortUrlService {
                 shortUrl.getExpiresAt(),
                 shortUrl.isActive()
         );
+    }
+
+    private String handleCacheHit(
+            String shortCode,
+            String originalUrl
+    ) {
+        int updatedRows =
+                repository.incrementClickCount(shortCode);
+
+        if (updatedRows == 0) {
+            urlCacheService.evict(shortCode);
+
+            throw new ShortUrlUnavailableException(
+                    "Short URL is no longer available: "
+                            + shortCode
+            );
+        }
+
+        return originalUrl;
+    }
+
+    private String handleCacheMiss(String shortCode) {
+        ShortUrl shortUrl = find(shortCode);
+
+        validateAvailability(shortUrl);
+
+        shortUrl.recordClick();
+
+        urlCacheService.put(
+                shortUrl.getShortCode(),
+                shortUrl.getOriginalUrl(),
+                shortUrl.getExpiresAt()
+        );
+
+        return shortUrl.getOriginalUrl();
+    }
+
+    private void validateAvailability(ShortUrl shortUrl) {
+        if (!shortUrl.isActive()) {
+            throw new ShortUrlUnavailableException(
+                    "Short URL is inactive: "
+                            + shortUrl.getShortCode()
+            );
+        }
+
+        if (shortUrl.isExpired(Instant.now())) {
+            throw new ShortUrlUnavailableException(
+                    "Short URL has expired: "
+                            + shortUrl.getShortCode()
+            );
+        }
     }
 
     private ShortUrl find(String shortCode) {
