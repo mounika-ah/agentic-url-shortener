@@ -5,6 +5,8 @@ import com.shortforge.dto.CreateShortUrlResponse;
 import com.shortforge.dto.UrlAnalyticsResponse;
 import com.shortforge.service.IdempotentUrlCreationService;
 import com.shortforge.service.ShortUrlService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +14,10 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/urls")
+@Tag(
+        name = "Short URL API",
+        description = "Create shortened URLs and retrieve analytics"
+)
 public class ShortUrlController {
 
     private final ShortUrlService shortUrlService;
@@ -26,6 +32,14 @@ public class ShortUrlController {
     }
 
     @PostMapping
+    @Operation(
+            summary = "Create a short URL",
+            description = """
+                    Creates a shortened URL using an idempotency key.
+                    Repeated requests with the same key and payload return
+                    the previously created result.
+                    """
+    )
     public ResponseEntity<CreateShortUrlResponse> create(
             @RequestHeader("Idempotency-Key")
             String idempotencyKey,
@@ -46,6 +60,13 @@ public class ShortUrlController {
     }
 
     @GetMapping("/{shortCode}/analytics")
+    @Operation(
+            summary = "Get URL analytics",
+            description = """
+                    Returns URL metadata, click count,
+                    expiration information and active status.
+                    """
+    )
     public UrlAnalyticsResponse getAnalytics(
             @PathVariable String shortCode
     ) {
