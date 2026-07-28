@@ -31,6 +31,18 @@
 		<testcontainers.version>2.0.5</testcontainers.version>
 	</properties>
 
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 
 		<!-- Application dependencies -->
@@ -102,7 +114,7 @@
 			<version>3.0.3</version>
 		</dependency>
 
-		<!-- General unit testing -->
+		<!-- General testing -->
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -147,16 +159,14 @@
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>testcontainers</artifactId>
-			<version>${testcontainers.version}</version>
 			<scope>test</scope>
 		</dependency>
 
-		<!-- Testcontainers JUnit 5 support -->
+		<!-- Testcontainers JUnit support -->
 
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>testcontainers-junit-jupiter</artifactId>
-			<version>${testcontainers.version}</version>
 			<scope>test</scope>
 		</dependency>
 
@@ -165,7 +175,6 @@
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>testcontainers-postgresql</artifactId>
-			<version>${testcontainers.version}</version>
 			<scope>test</scope>
 		</dependency>
 
